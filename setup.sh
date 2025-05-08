@@ -262,6 +262,33 @@ package_installed() {
 }
 
 #######################################
+# Fix package mirrors and update mirror list
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+fix_mirrors() {
+  log "Fixing package mirrors and updating mirror list"
+  
+  # Backup current mirrorlist
+  if [ -f "/etc/pacman.d/mirrorlist" ]; then
+    log "Backing up current mirrorlist"
+    cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup.$(date +%Y%m%d%H%M%S)
+  fi
+  
+  # Update mirrorlist using reflector to get fast and reliable US mirrors
+  log "Updating mirrorlist with reflector for US mirrors. This may take a moment..."
+  reflector --protocol https --latest 20 --fastest 10 --score 90 --sort rate --save /etc/pacman.d/mirrorlist --verbose --country 'United States' --age 12
+  
+  # Update the pacman databases and upgrade packages
+  log "Updating package databases and upgrading system with new mirror list"
+  pacman -Syu --noconfirm
+  
+  log "Mirror list updated and system upgraded successfully with optimized US mirrors"
+}
+
+#######################################
 # Install packages if they are not already installed
 # Arguments:
 #   List of packages to install
@@ -1395,6 +1422,7 @@ main() {
   log "Starting Arch Linux system setup script"
   
   check_root
+  fix_mirrors
   
   # Parse command line options
   while [[ $# -gt 0 ]]; do
