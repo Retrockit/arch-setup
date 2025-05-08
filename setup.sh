@@ -230,12 +230,7 @@ readonly DOCKER_PACKAGES=(
 )
 
 readonly PODMAN_PACKAGES=(
-  "podman"
-  "podman-compose" 
-  "podman-docker"
-  "cni-plugins"
-  "slirp4netns"
-  "fuse-overlayfs"
+    "podman"
 )
 
 # KVM/libvirt packages
