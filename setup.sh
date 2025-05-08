@@ -1334,11 +1334,8 @@ main() {
   install_powershell
   
   # Install and configure Lua
-  install_lua_and_luarocks
-  
-  # Install Steam
-  install_steam
-  
+  install_lua_and_luarocks  
+ 
   # Install Msty app
   install_msty_app
   
