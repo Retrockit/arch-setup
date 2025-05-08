@@ -130,7 +130,6 @@ readonly LOG_MARKER=">>>"
 readonly CONTAINERS_REGISTRIES_CONF="/etc/containers/registries.conf"
 readonly JETBRAINS_INSTALL_DIR="/home/$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")/.local/share/JetBrains/Toolbox/bin"
 readonly JETBRAINS_SYMLINK_DIR="/home/$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")/.local/bin"
-readonly PYENV_INSTALLER="https://pyenv.run"
 readonly MISE_INSTALLER="https://mise.run"
 readonly FLATHUB_REPO="https://flathub.org/repo/flathub.flatpakrepo"
 
@@ -149,25 +148,6 @@ readonly DEV_PACKAGES=(
   "python" 
   "python-pip"
   "readline"
-)
-
-# Pyenv build dependencies (Arch package names)
-readonly PYENV_DEPENDENCIES=(
-  "base-devel"
-  "openssl"
-  "zlib"
-  "bzip2"
-  "readline"
-  "sqlite"
-  "curl"
-  "git"
-  "ncurses"
-  "xz"
-  "tk"
-  "libffi"
-  "python-setuptools"
-  "python-wheel"
-  "python-pip"
 )
 
 readonly UTIL_PACKAGES=(
@@ -704,80 +684,74 @@ EOF
 }
 
 #######################################
-# Install pyenv for the current user
+# Install pyenv for the current user from Arch repository
 # Globals:
-#   PYENV_DEPENDENCIES
-#   PYENV_INSTALLER
+#   None
 # Arguments:
 #   None
 #######################################
 install_pyenv() {
-  log "Installing pyenv dependencies"
-  install_packages "${PYENV_DEPENDENCIES[@]}"
+  log "Installing pyenv from Arch repository"
+  
+  # Install pyenv package and required dependencies
+  install_packages "pyenv" "base-devel" "openssl" "zlib" "xz" "tk"
   
   local current_user
   current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
   
-  log "Installing pyenv for user ${current_user}"
+  log "Configuring pyenv for user ${current_user}"
   
-  # Check if pyenv is already installed
-  if su -l "${current_user}" -c "command -v pyenv" >/dev/null 2>&1; then
-    log "pyenv is already installed for user ${current_user}"
-  else
-    log "Installing pyenv using the installer script"
-    su -l "${current_user}" -c "curl -fsSL ${PYENV_INSTALLER} | bash"
-    
-    # Set up shell integration for bash
-    if [ -f "/home/${current_user}/.bashrc" ]; then
-      if ! grep -q "pyenv init" "/home/${current_user}/.bashrc"; then
-        log "Setting up pyenv in .bashrc"
-        cat >> "/home/${current_user}/.bashrc" << 'EOF'
+  # Set up shell integration for bash
+  if [ -f "/home/${current_user}/.bashrc" ]; then
+    if ! grep -q "pyenv init" "/home/${current_user}/.bashrc"; then
+      log "Setting up pyenv in .bashrc"
+      cat >> "/home/${current_user}/.bashrc" << 'EOF'
 
 # pyenv setup
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
 EOF
-      fi
+      chown "${current_user}:${current_user}" "/home/${current_user}/.bashrc"
     fi
-    
-    # Set up shell integration for fish
-    local fish_config_dir="/home/${current_user}/.config/fish"
-    local fish_config_file="${fish_config_dir}/config.fish"
-    
-    if [ ! -d "${fish_config_dir}" ]; then
-      mkdir -p "${fish_config_dir}"
-      chown "${current_user}:${current_user}" "${fish_config_dir}"
-    fi
-    
-    if [ -f "${fish_config_file}" ]; then
-      if ! grep -q "pyenv init" "${fish_config_file}"; then
-        log "Setting up pyenv in fish config"
-        cat >> "${fish_config_file}" << 'EOF'
+  fi
+  
+  # Set up shell integration for fish
+  local fish_config_dir="/home/${current_user}/.config/fish"
+  local fish_config_file="${fish_config_dir}/config.fish"
+  
+  if [ ! -d "${fish_config_dir}" ]; then
+    mkdir -p "${fish_config_dir}"
+    chown "${current_user}:${current_user}" "${fish_config_dir}"
+  fi
+  
+  if [ -f "${fish_config_file}" ]; then
+    if ! grep -q "pyenv init" "${fish_config_file}"; then
+      log "Setting up pyenv in fish config"
+      cat >> "${fish_config_file}" << 'EOF'
 
 # pyenv setup
 set -gx PYENV_ROOT $HOME/.pyenv
 fish_add_path $PYENV_ROOT/bin
-pyenv init - | source
-status --is-interactive; and pyenv virtualenv-init - | source
-EOF
-        chown "${current_user}:${current_user}" "${fish_config_file}"
-      fi
-    else
-      log "Creating fish config with pyenv setup"
-      cat > "${fish_config_file}" << 'EOF'
-# pyenv setup
-set -gx PYENV_ROOT $HOME/.pyenv
-fish_add_path $PYENV_ROOT/bin
-pyenv init - | source
-status --is-interactive; and pyenv virtualenv-init - | source
+status --is-interactive; and pyenv init - | source
 EOF
       chown "${current_user}:${current_user}" "${fish_config_file}"
     fi
-    
-    log "pyenv installed successfully for user ${current_user}"
+  else
+    log "Creating fish config with pyenv setup"
+    cat > "${fish_config_file}" << 'EOF'
+# pyenv setup
+set -gx PYENV_ROOT $HOME/.pyenv
+fish_add_path $PYENV_ROOT/bin
+status --is-interactive; and pyenv init - | source
+EOF
+    chown "${current_user}:${current_user}" "${fish_config_file}"
   fi
+  
+  log "pyenv installed and configured successfully"
+  
+  # Also remove the unused constant
+  # Update the top of the script to remove: readonly PYENV_INSTALLER="https://pyenv.run"
 }
 
 #######################################
