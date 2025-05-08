@@ -181,6 +181,7 @@ readonly FLATPAK_APPS=(
   "org.DolphinEmu.dolphin-emu"         # Dolphin Emulator
   "net.pcsx2.PCSX2"                    # PCSX2
   "io.github.mhogomchungu.media-downloader" # Media Downloader
+  "com.valvesoftware.Steam" # Steam
 )
 
 # Lua build dependencies
