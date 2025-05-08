@@ -1003,6 +1003,45 @@ EOF
 }
 
 #######################################
+# Install Fisher plugin manager for Fish shell
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+install_fisher() {
+  local current_user
+  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
+  
+  # Ensure fish is installed
+  if ! command_exists fish; then
+    log "Fish shell must be installed before Fisher. Installing Fish first."
+    configure_fish_shell
+  fi
+  
+  log "Installing Fisher plugin manager for Fish shell"
+  
+  # Check if Fisher is already installed
+  if su -l "${current_user}" -c "fish -c 'type -q fisher'" 2>/dev/null; then
+    log "Fisher is already installed"
+    return 0
+  fi
+  
+  # Install Fisher using the official method
+  log "Downloading and installing Fisher"
+  su -l "${current_user}" -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c 'source && fisher install jorgebucaran/fisher'"
+  
+  # Verify installation
+  if su -l "${current_user}" -c "fish -c 'type -q fisher'" 2>/dev/null; then
+    log "Fisher has been successfully installed"
+    return 0
+  else
+    log "Warning: Fisher installation may have failed. Please check manually."
+    return 1
+  fi
+}
+
+#######################################
 # Install and configure KVM with libvirt on Arch Linux
 # Globals:
 #   KVM_PACKAGES
@@ -1402,6 +1441,9 @@ main() {
   
   # Configure fish shell
   configure_fish_shell
+
+  # Install Fisher plugin manager for fish (after fish is installed)
+  install_fisher
   
   # Install and Configure KVM/QEMU for virtualization
   install_kvm_libvirt
