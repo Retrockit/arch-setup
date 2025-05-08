@@ -247,6 +247,10 @@ readonly KVM_PACKAGES=(
   "guestfs-tools"
   "libosinfo"
   "tuned"
+  "python-gobject"     # Required by virt-manager
+  "python-cairo"       # Required by virt-manager
+  "vte3"               # Terminal widget for virt-manager
+  "python-pyqt5"       # Qt bindings for virt-manager
 )
 
 # Helper functions
