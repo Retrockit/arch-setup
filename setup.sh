@@ -401,6 +401,78 @@ install_aur_helper() {
 }
 
 #######################################
+# Install packages from AUR safely without terminal requirement
+# Arguments:
+#   List of packages to install
+# Returns:
+#   0 on success, 1 on failure
+#######################################
+install_aur_packages_safely() {
+  local packages=("$@")
+  local current_user
+  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
+  local failed_packages=()
+  
+  # Ensure AUR helper is installed
+  if ! command_exists yay; then
+    install_aur_helper
+  fi
+  
+  log "Installing AUR packages with temporary sudo permissions: ${packages[*]}"
+  
+  # Use the NOPASSWD option for the specific user temporarily
+  local sudoers_tmp="/etc/sudoers.d/10_${current_user}_temp"
+  echo "${current_user} ALL=(ALL) NOPASSWD: /usr/bin/pacman" > "${sudoers_tmp}"
+  chmod 440 "${sudoers_tmp}"
+  
+  # Install each package
+  for pkg in "${packages[@]}"; do
+    if package_installed "${pkg}"; then
+      log "AUR Package ${pkg} is already installed"
+      continue
+    fi
+    
+    log "Installing AUR package: ${pkg}"
+    if ! su -l "${current_user}" -c "yay -S ${pkg} --noconfirm"; then
+      log "Standard yay installation failed for ${pkg}, attempting alternative approach"
+      
+      # Alternative: Download only and then install as root
+      if su -l "${current_user}" -c "cd /tmp && yay -G ${pkg} && cd /tmp/${pkg} && makepkg -s --noconfirm"; then
+        # Find the built package
+        local pkg_file
+        pkg_file=$(find "/tmp/${pkg}" -name "*.pkg.tar.zst" | head -n 1)
+        
+        if [ -n "${pkg_file}" ]; then
+          log "Installing built package: ${pkg_file}"
+          if ! pacman -U --noconfirm "${pkg_file}"; then
+            log "Failed to install built package: ${pkg_file}"
+            failed_packages+=("${pkg}")
+          fi
+        else
+          log "Failed to find built package file for ${pkg}"
+          failed_packages+=("${pkg}")
+        fi
+      else
+        log "Failed to build ${pkg} package"
+        failed_packages+=("${pkg}")
+      fi
+    fi
+  done
+  
+  # Remove the temporary sudoers file
+  rm -f "${sudoers_tmp}"
+  
+  # Report results
+  if [ ${#failed_packages[@]} -eq 0 ]; then
+    log "All AUR packages installed successfully"
+    return 0
+  else
+    log "Warning: Failed to install the following AUR packages: ${failed_packages[*]}"
+    return 1
+  fi
+}
+
+#######################################
 # Install packages from AUR if they are not already installed
 # Arguments:
 #   List of packages to install
@@ -408,14 +480,8 @@ install_aur_helper() {
 install_aur_packages() {
   local packages=("$@")
   local packages_to_install=()
-  local current_user
-  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
   local pkg
-
-  if ! command_exists yay; then
-    install_aur_helper
-  fi
-
+  
   # Check which packages need to be installed
   for pkg in "${packages[@]}"; do
     if ! package_installed "${pkg}"; then
@@ -424,14 +490,11 @@ install_aur_packages() {
       log "AUR Package ${pkg} is already installed"
     fi
   done
-
+  
   # Install missing packages if any
   if (( ${#packages_to_install[@]} > 0 )); then
     log "Installing AUR packages: ${packages_to_install[*]}"
-    if ! su -l "${current_user}" -c "yay -S --noconfirm ${packages_to_install[*]}"; then
-      err "Failed to install AUR packages: ${packages_to_install[*]}"
-    fi
-    log "Successfully installed AUR packages: ${packages_to_install[*]}"
+    install_aur_packages_safely "${packages_to_install[@]}"
   else
     log "All AUR packages already installed, skipping"
   fi
@@ -1053,29 +1116,29 @@ install_lua_and_luarocks() {
 #######################################
 # Install JetBrains Toolbox from AUR
 # Globals:
-#   JETBRAINS_INSTALL_DIR
-#   JETBRAINS_SYMLINK_DIR
+#   None
 # Arguments:
 #   None
 #######################################
 install_jetbrains_toolbox() {
-  local current_user
-  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
+  log "Installing JetBrains Toolbox from AUR"
   
-  # Check if JetBrains Toolbox is already installed from AUR
+  # Check if already installed
   if package_installed "jetbrains-toolbox"; then
     log "JetBrains Toolbox is already installed"
     return 0
   fi
   
-  log "Installing JetBrains Toolbox from AUR"
-  install_aur_packages "jetbrains-toolbox"
+  # Install using the safe method
+  install_aur_packages_safely "jetbrains-toolbox"
   
   # Verify installation
-  if command_exists jetbrains-toolbox; then
+  if package_installed "jetbrains-toolbox"; then
     log "JetBrains Toolbox installed successfully"
+    return 0
   else
-    log "Warning: JetBrains Toolbox may not have installed correctly. Please check manually."
+    log "Warning: JetBrains Toolbox installation verification failed"
+    return 1
   fi
 }
 
@@ -1089,29 +1152,23 @@ install_jetbrains_toolbox() {
 install_msty_app() {
   log "Installing Msty.app from AUR"
   
-  # Ensure AUR helper is installed
-  if ! command_exists yay; then
-    install_aur_helper
-  fi
-  
   # Check if Msty is already installed
   if package_installed "msty-bin"; then
     log "Msty.app is already installed"
     return 0
   fi
   
-  # Install msty-bin from AUR
-  local current_user
-  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
+  # Install msty-bin using the safe method
+  install_aur_packages_safely "msty-bin"
   
-  log "Installing msty-bin from AUR"
-  if ! su -l "${current_user}" -c "yay -S --noconfirm msty-bin"; then
-    log "Warning: Failed to install msty-bin from AUR"
+  # Verify installation
+  if package_installed "msty-bin"; then
+    log "Msty.app installed successfully"
+    return 0
+  else
+    log "Warning: Msty.app installation verification failed"
     return 1
   fi
-  
-  log "Msty.app installed successfully"
-  return 0
 }
 
 #######################################
@@ -1130,44 +1187,8 @@ install_powershell() {
     return 0
   fi
   
-  # Ensure AUR helper is installed
-  if ! command_exists yay; then
-    install_aur_helper
-  fi
-  
-  local current_user
-  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
-  
-  log "Installing powershell-bin from AUR using yay"
-  
-  # Use the NOPASSWD option for the specific user temporarily
-  local sudoers_tmp="/etc/sudoers.d/10_${current_user}_temp"
-  echo "${current_user} ALL=(ALL) NOPASSWD: /usr/bin/pacman" > "${sudoers_tmp}"
-  chmod 440 "${sudoers_tmp}"
-  
-  # Build the package with yay (with --noconfirm to avoid prompts)
-  if ! su -l "${current_user}" -c "yay -S powershell-bin --noconfirm"; then
-    log "Standard yay installation failed, attempting alternative approach"
-    
-    # Alternative: Download only and then install as root
-    if su -l "${current_user}" -c "cd /tmp && yay -G powershell-bin && cd /tmp/powershell-bin && makepkg -s --noconfirm"; then
-      # Find the built package
-      local pkg_file
-      pkg_file=$(find /tmp/powershell-bin -name "*.pkg.tar.zst" | head -n 1)
-      
-      if [ -n "${pkg_file}" ]; then
-        log "Installing built package: ${pkg_file}"
-        pacman -U --noconfirm "${pkg_file}"
-      else
-        log "Failed to find built package file"
-      fi
-    else
-      log "Failed to build powershell-bin package"
-    fi
-  fi
-  
-  # Remove the temporary sudoers file
-  rm -f "${sudoers_tmp}"
+  # Install powershell-bin using the safe method
+  install_aur_packages_safely "powershell-bin"
   
   # Verify installation
   if command_exists pwsh; then
@@ -1191,44 +1212,20 @@ install_powershell() {
 install_1password() {
   log "Installing 1Password from AUR"
   
-  # Ensure AUR helper is installed
-  if ! command_exists yay; then
-    install_aur_helper
-  fi
-  
-  # Check if 1Password is already installed
-  if package_installed "1password"; then
-    log "1Password is already installed"
-  else
-    # Install 1Password from AUR
-    local current_user
-    current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
-    
-    log "Installing 1password from AUR"
-    if ! su -l "${current_user}" -c "yay -S --noconfirm 1password"; then
-      log "Warning: Failed to install 1password from AUR"
-    fi
-  fi
-  
-  # Check if 1Password CLI is already installed
-  if package_installed "1password-cli"; then
-    log "1Password CLI is already installed"
-  else
-    # Install 1Password CLI from AUR
-    local current_user
-    current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
-    
-    log "Installing 1password-cli from AUR"
-    if ! su -l "${current_user}" -c "yay -S --noconfirm 1password-cli"; then
-      log "Warning: Failed to install 1password-cli from AUR"
-    fi
-  fi
+  # Install both 1password and 1password-cli with the safe method
+  install_aur_packages_safely "1password" "1password-cli"
   
   # Verify installation
   if package_installed "1password" && package_installed "1password-cli"; then
     log "1Password and 1Password CLI installed successfully"
   else
-    log "Warning: 1Password and/or 1Password CLI may not have installed correctly. Please check manually."
+    if package_installed "1password"; then
+      log "1Password installed successfully, but CLI installation may have failed"
+    elif package_installed "1password-cli"; then
+      log "1Password CLI installed successfully, but desktop app installation may have failed"
+    else
+      log "Warning: Both 1Password and 1Password CLI installations may have failed"
+    fi
   fi
 }
 
