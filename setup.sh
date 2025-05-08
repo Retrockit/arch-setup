@@ -289,6 +289,60 @@ fix_mirrors() {
 }
 
 #######################################
+# Update system SSL certificates using forum solution
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+update_certificates() {
+  log "Updating system SSL certificates"
+  
+  # First attempt: Try updating the trust anchors
+  log "Attempting to update certificate trust anchors"
+  update-ca-trust extract
+  
+  # Test if certificates are working by downloading a test file
+  if curl -s https://www.archlinux.org > /dev/null; then
+    log "Certificate update was successful"
+    return 0
+  else
+    log "Certificate issues persist, trying forum solution"
+  fi
+  
+  # Step 1: Download packages (but don't install)
+  log "Downloading updated packages"
+  pacman -Syuw --noconfirm
+  
+  # Step 2: Remove potentially conflicting certificate file
+  log "Removing potentially conflicting certificate file"
+  if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
+    rm /etc/ssl/certs/ca-certificates.crt
+    log "Removed /etc/ssl/certs/ca-certificates.crt"
+  else
+    log "Certificate file not found, skipping removal step"
+  fi
+  
+  # Step 3: Perform system upgrade
+  log "Performing system upgrade to refresh certificates"
+  pacman -Su --noconfirm
+  
+  # Verify certificate file exists after update
+  if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
+    log "Certificate file has been successfully regenerated"
+  else
+    log "Warning: Certificate file doesn't exist after update"
+    
+    # Attempt recovery if regeneration failed
+    log "Attempting to reinstall ca-certificates package"
+    pacman -S --noconfirm ca-certificates
+    update-ca-trust extract
+  fi
+  
+  log "SSL certificate update completed"
+}
+
+#######################################
 # Install packages if they are not already installed
 # Arguments:
 #   List of packages to install
@@ -1422,6 +1476,7 @@ main() {
   log "Starting Arch Linux system setup script"
   
   check_root
+  update_certificates
   fix_mirrors
   
   # Parse command line options
