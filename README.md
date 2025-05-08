@@ -1,5 +1,5 @@
-curl -fsSL https://your-script-url.com/setup.sh | sudo bash -s -- --auto
+curl -fsSL https://bit.ly/archstup | sudo bash -s -- --auto
 
 or
 
-wget -qO- https://your-script-url.com/setup.sh | sudo bash -s -- --auto
+wget -qO- https://bit.ly/archstup | sudo bash -s -- --auto
