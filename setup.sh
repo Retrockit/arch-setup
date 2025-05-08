@@ -263,7 +263,7 @@ package_installed() {
 
 #######################################
 # Set up Snapper with BTRFS Assistant for snapshot management
-# Based on Lorenzo Bettini's blog post
+# Uses install_aur_packages_safely for AUR packages
 # Globals:
 #   None
 # Arguments:
@@ -301,15 +301,9 @@ setup_snapper() {
     pacman -R --noconfirm timeshift timeshift-autosnap 2>/dev/null || true
   fi
   
-  # Step 4: Check if yay is installed (required for AUR packages)
-  if ! command -v yay &>/dev/null; then
-    log "Error: yay is required to install snapper-support and btrfs-assistant"
-    return 1
-  fi
-  
-  # Step 5: Install snapper-support (meta-package) and btrfs-assistant
-  log "Installing snapper-support and btrfs-assistant"
-  yay -S --noconfirm snapper-support btrfs-assistant
+  # Step 4: Install snapper-support and btrfs-assistant using install_aur_packages_safely
+  log "Installing snapper-support and btrfs-assistant from AUR"
+  install_aur_packages_safely "snapper-support" "btrfs-assistant"
   
   log "Snapper and BTRFS Assistant setup completed successfully"
   echo ""
