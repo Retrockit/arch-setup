@@ -262,14 +262,14 @@ package_installed() {
 }
 
 #######################################
-# Fix package mirrors and update mirror list
+# Update mirror list with optimized mirrors
 # Globals:
 #   None
 # Arguments:
 #   None
 #######################################
-fix_mirrors() {
-  log "Fixing package mirrors and updating mirror list"
+update_mirrorlist() {
+  log "Updating package mirrors and mirror list"
   
   # Backup current mirrorlist
   if [ -f "/etc/pacman.d/mirrorlist" ]; then
@@ -281,11 +281,7 @@ fix_mirrors() {
   log "Updating mirrorlist with reflector for US mirrors. This may take a moment..."
   reflector --protocol https --latest 20 --fastest 10 --score 90 --sort rate --save /etc/pacman.d/mirrorlist --verbose --country 'United States' --age 12
   
-  # Update the pacman databases and upgrade packages
-  log "Updating package databases and upgrading system with new mirror list"
-  pacman -Syu --noconfirm
-  
-  log "Mirror list updated and system upgraded successfully with optimized US mirrors"
+  log "Mirror list updated successfully with optimized US mirrors"
 }
 
 #######################################
@@ -1477,7 +1473,7 @@ main() {
   
   check_root
   update_certificates
-  fix_mirrors
+  update_mirrorlist
   
   # Parse command line options
   while [[ $# -gt 0 ]]; do
