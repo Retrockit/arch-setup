@@ -262,6 +262,70 @@ package_installed() {
 }
 
 #######################################
+# Set up Snapper with BTRFS Assistant for snapshot management
+# Based on Lorenzo Bettini's blog post
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+setup_snapper() {
+  log "Setting up Snapper and BTRFS Assistant for snapshot management"
+  
+  # First check if system is using BTRFS for root
+  if ! mount | grep -q "/ type btrfs"; then
+    log "Error: Root filesystem is not BTRFS. Snapper requires BTRFS."
+    return 1
+  fi
+  
+  # Step 1: Remove existing grub-btrfs if present (to avoid conflicts)
+  if pacman -Q grub-btrfs &>/dev/null; then
+    log "Removing existing grub-btrfs package"
+    pacman -R --noconfirm grub-btrfs
+  fi
+  
+  # Step 2: Remove any existing custom systemd service files for grub-btrfsd
+  if [ -f "/etc/systemd/system/grub-btrfsd.service" ]; then
+    log "Removing grub-btrfsd service file"
+    rm -f /etc/systemd/system/grub-btrfsd.service
+  fi
+  
+  if [ -f "/etc/systemd/system/multi-user.target.wants/grub-btrfsd.service" ]; then
+    log "Removing grub-btrfsd service symlink"
+    rm -f /etc/systemd/system/multi-user.target.wants/grub-btrfsd.service
+  fi
+  
+  # Step 3: Remove timeshift and timeshift-autosnap if present
+  if pacman -Q timeshift &>/dev/null || pacman -Q timeshift-autosnap &>/dev/null; then
+    log "Removing timeshift and timeshift-autosnap packages"
+    pacman -R --noconfirm timeshift timeshift-autosnap 2>/dev/null || true
+  fi
+  
+  # Step 4: Check if yay is installed (required for AUR packages)
+  if ! command -v yay &>/dev/null; then
+    log "Error: yay is required to install snapper-support and btrfs-assistant"
+    return 1
+  fi
+  
+  # Step 5: Install snapper-support (meta-package) and btrfs-assistant
+  log "Installing snapper-support and btrfs-assistant"
+  yay -S --noconfirm snapper-support btrfs-assistant
+  
+  log "Snapper and BTRFS Assistant setup completed successfully"
+  echo ""
+  echo "======================================================================"
+  echo "SNAPPER AND BTRFS ASSISTANT SETUP COMPLETED"
+  echo ""
+  echo "You can now manage snapshots using the btrfs-assistant GUI"
+  echo "Command: btrfs-assistant"
+  echo ""
+  echo "Snapshots will automatically be created when installing/updating packages"
+  echo "You can boot into snapshots from the GRUB menu"
+  echo "======================================================================"
+  echo ""
+}
+
+#######################################
 # Update mirror list with optimized mirrors
 # Globals:
 #   None
@@ -1331,6 +1395,27 @@ install_chrome_beta() {
 }
 
 #######################################
+# Enable and start Bluetooth service
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+enable_bluetooth() {
+  log "Enabling Bluetooth service"
+  
+  # Enable and start bluetooth service
+  systemctl enable bluetooth.service
+  systemctl start bluetooth.service
+  
+  if systemctl is-active bluetooth.service &>/dev/null; then
+    log "Bluetooth service has been successfully enabled and started"
+  else
+    log "Warning: Bluetooth service could not be started. Please check 'systemctl status bluetooth.service'"
+  fi
+}
+
+#######################################
 # Perform final system update
 # Globals:
 #   None
@@ -1414,9 +1499,7 @@ main() {
   log "Starting Arch Linux system setup script"
   
   check_root
-  update_certificates
-  update_mirrorlist
-  
+    
   # Parse command line options
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1442,10 +1525,22 @@ main() {
   
   # Now make AUTO_MODE readonly after argument parsing
   readonly AUTO_MODE
+
+  # Fix certificates first
+  update_certificates
   
-  # Update system
+  # Update mirrors second (since they depend on working certificates)
+  update_mirrorlist
+  
+  # Update system packages third (with working certificates and mirrors)
   update_system
+
+  # Enable Bluetooth service
+  enable_bluetooth
   
+  # Set up Snapper for BTRFS snapshots (after system update for clean starting point)
+  setup_snapper
+   
   # Install system packages
   log "Installing system packages"
   install_packages "${SYSTEM_PACKAGES[@]}"
