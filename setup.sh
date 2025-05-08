@@ -825,10 +825,6 @@ install_mise() {
       su -l "${current_user}" -c "echo '~/.local/bin/mise activate fish | source' > '${fish_config_file}'"
     fi
     
-    # Setup global usage
-    log "Setting up mise global usage"
-    su -l "${current_user}" -c "~/.local/bin/mise use -g deno node python ruby"
-    
     # Generate mise completions for fish
     log "Generating mise completions for fish"
     su -l "${current_user}" -c "~/.local/bin/mise completion fish > '${fish_completions_dir}/mise.fish'"
