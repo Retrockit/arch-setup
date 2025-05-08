@@ -1124,26 +1124,50 @@ install_msty_app() {
 install_powershell() {
   log "Installing PowerShell from AUR"
   
-  # Ensure AUR helper is installed
-  if ! command_exists yay; then
-    install_aur_helper
-  fi
-  
   # Check if PowerShell is already installed
   if command_exists pwsh; then
     log "PowerShell is already installed"
     return 0
   fi
   
-  # Install powershell from AUR
+  # Ensure AUR helper is installed
+  if ! command_exists yay; then
+    install_aur_helper
+  fi
+  
   local current_user
   current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
   
-  log "Installing powershell from AUR"
-  if ! su -l "${current_user}" -c "yay -S --noconfirm powershell-bin"; then
-    log "Warning: Failed to install powershell from AUR"
-    return 1
+  log "Installing powershell-bin from AUR using yay"
+  
+  # Use the NOPASSWD option for the specific user temporarily
+  local sudoers_tmp="/etc/sudoers.d/10_${current_user}_temp"
+  echo "${current_user} ALL=(ALL) NOPASSWD: /usr/bin/pacman" > "${sudoers_tmp}"
+  chmod 440 "${sudoers_tmp}"
+  
+  # Build the package with yay (with --noconfirm to avoid prompts)
+  if ! su -l "${current_user}" -c "yay -S powershell-bin --noconfirm"; then
+    log "Standard yay installation failed, attempting alternative approach"
+    
+    # Alternative: Download only and then install as root
+    if su -l "${current_user}" -c "cd /tmp && yay -G powershell-bin && cd /tmp/powershell-bin && makepkg -s --noconfirm"; then
+      # Find the built package
+      local pkg_file
+      pkg_file=$(find /tmp/powershell-bin -name "*.pkg.tar.zst" | head -n 1)
+      
+      if [ -n "${pkg_file}" ]; then
+        log "Installing built package: ${pkg_file}"
+        pacman -U --noconfirm "${pkg_file}"
+      else
+        log "Failed to find built package file"
+      fi
+    else
+      log "Failed to build powershell-bin package"
+    fi
   fi
+  
+  # Remove the temporary sudoers file
+  rm -f "${sudoers_tmp}"
   
   # Verify installation
   if command_exists pwsh; then
