@@ -1188,6 +1188,40 @@ install_1password() {
 }
 
 #######################################
+# Install gaming device udev rules from AUR
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+install_gaming_udev_rules() {
+  log "Installing gaming device udev rules from AUR"
+  
+  # Check if already installed
+  if package_installed "game-devices-udev"; then
+    log "Gaming device udev rules are already installed"
+    return 0
+  fi
+  
+  # Install using our safe AUR installation method
+  install_aur_packages_safely "game-devices-udev"
+  
+  # Reload udev rules
+  log "Reloading udev rules"
+  udevadm control --reload-rules
+  udevadm trigger
+  
+  # Verify installation
+  if package_installed "game-devices-udev"; then
+    log "Gaming device udev rules installed successfully"
+    return 0
+  else
+    log "Warning: Gaming device udev rules installation verification failed"
+    return 1
+  fi
+}
+
+#######################################
 # Perform final system update
 # Globals:
 #   None
@@ -1321,6 +1355,9 @@ main() {
   
   # Install Flatpak apps
   install_flatpak_apps
+
+  # Inside your main function where you install other AUR packages
+  install_gaming_udev_rules
   
   # Install Docker
   install_docker
