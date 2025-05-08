@@ -143,11 +143,7 @@ readonly SYSTEM_PACKAGES=(
 )
 
 readonly DEV_PACKAGES=(
-  "gcc"
-  "git" 
-  "python" 
-  "python-pip"
-  "readline"
+  "base-devel"    # Meta-package that includes gcc, make, patch, etc.
 )
 
 readonly UTIL_PACKAGES=(
@@ -187,15 +183,6 @@ readonly FLATPAK_APPS=(
   "io.github.mhogomchungu.media-downloader" # Media Downloader
 )
 
-# Steam dependencies (Arch package names)
-readonly STEAM_DEPENDENCIES=(
-  "lib32-nvidia-utils"       # For NVIDIA GPUs
-  "lib32-mesa"               # For AMD/Intel GPUs
-  "lib32-vulkan-icd-loader"  # Vulkan support
-  "vulkan-icd-loader"        # Vulkan support
-  "lib32-libva-mesa-driver"  # VA-API video acceleration
-)
-
 # Lua build dependencies
 readonly LUA_DEPENDENCIES=(
   "base-devel"
@@ -213,24 +200,13 @@ readonly PODMAN_PACKAGES=(
     "podman"
 )
 
-# KVM/libvirt packages
+# KVM/libvirt packages - minimal required set
 readonly KVM_PACKAGES=(
-  "qemu-full"
-  "qemu-img"
-  "libvirt"
-  "virt-install"
-  "virt-manager"
-  "virt-viewer"
-  "edk2-ovmf"
-  "dnsmasq"
-  "swtpm"
-  "guestfs-tools"
-  "libosinfo"
-  "tuned"
-  "python-gobject"     # Required by virt-manager
-  "python-cairo"       # Required by virt-manager
-  "vte3"               # Terminal widget for virt-manager
-  "python-pyqt5"       # Qt bindings for virt-manager
+  "libvirt"       # Virtualization API
+  "virt-manager"  # GUI management tool
+  "qemu-full"     # QEMU with all features
+  "dnsmasq"       # DNS/DHCP for virtual networks
+  "dmidecode"     # System information retrieval tool
 )
 
 # Helper functions
@@ -1065,38 +1041,6 @@ install_kvm_libvirt() {
   fi
   
   log "Virtualization setup completed successfully"
-}
-
-#######################################
-# Install Steam on Arch Linux
-# Globals:
-#   STEAM_DEPENDENCIES
-# Arguments:
-#   None
-#######################################
-install_steam() {
-  log "Installing Steam on Arch Linux"
-  
-  # Check if Steam is already installed
-  if package_installed "steam"; then
-    log "Steam is already installed"
-    return 0
-  fi
-  
-  # Install Steam dependencies
-  log "Installing Steam dependencies"
-  install_packages "${STEAM_DEPENDENCIES[@]}"
-  
-  # Install Steam
-  log "Installing Steam package"
-  install_packages "steam"
-  
-  # Verify installation
-  if package_installed "steam"; then
-    log "Steam installed successfully"
-  else
-    log "Warning: Steam installation may have failed. Please verify manually."
-  fi
 }
 
 #######################################
