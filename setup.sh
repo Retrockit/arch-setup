@@ -1222,6 +1222,76 @@ install_gaming_udev_rules() {
 }
 
 #######################################
+# Detect NVIDIA hardware and install drivers
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+install_nvidia_drivers() {
+  log "Checking for NVIDIA graphics hardware"
+  
+  # Check for NVIDIA hardware using lspci
+  if lspci | grep -i nvidia >/dev/null 2>&1; then
+    log "NVIDIA hardware detected"
+    
+    # Check if nvidia-inst tool is available (EndeavourOS specific)
+    if ! command -v nvidia-inst >/dev/null 2>&1; then
+      log "Error: nvidia-inst tool not found. This function requires EndeavourOS."
+      log "Please install NVIDIA drivers manually for your system."
+      return 1
+    fi
+    
+    # Run the EndeavourOS NVIDIA installer with 32-bit support
+    log "Installing NVIDIA drivers with 32-bit support"
+    nvidia-inst --32
+    
+    # Check installation status
+    if lsmod | grep -q nvidia; then
+      log "NVIDIA drivers installed successfully"
+    else
+      log "Warning: NVIDIA driver installation may have failed. Please check manually."
+      log "You may need to reboot for the drivers to load properly."
+    fi
+    
+    log "NVIDIA driver installation complete"
+  else
+    log "No NVIDIA hardware detected, skipping NVIDIA driver installation"
+  fi
+}
+
+#######################################
+# Install Google Chrome Beta from AUR
+# Globals:
+#   None
+# Arguments:
+#   None
+#######################################
+install_chrome_beta() {
+  log "Installing Google Chrome Beta from AUR"
+  
+  # Check if already installed
+  if package_installed "google-chrome-beta"; then
+    log "Google Chrome Beta is already installed"
+    return 0
+  fi
+  
+  # Install using our safe AUR installation method
+  install_aur_packages_safely "google-chrome-beta"
+  
+  # Verify installation
+  if package_installed "google-chrome-beta"; then
+    local chrome_version
+    chrome_version=$(pacman -Qi google-chrome-beta | grep Version | awk '{print $3}')
+    log "Google Chrome Beta installed successfully: ${chrome_version}"
+    return 0
+  else
+    log "Warning: Google Chrome Beta installation verification failed"
+    return 1
+  fi
+}
+
+#######################################
 # Perform final system update
 # Globals:
 #   None
@@ -1370,6 +1440,9 @@ main() {
   
   # Install PowerShell
   install_powershell
+
+  # Install chrome beta
+  install_chrome_beta
   
   # Install and configure Lua
   install_lua_and_luarocks  
@@ -1400,6 +1473,9 @@ main() {
   
   # Install and Configure KVM/QEMU for virtualization
   install_kvm_libvirt
+
+  # Install nvidia drivers
+  install_nvidia_drivers
   
   # Perform final system update
   perform_final_update
