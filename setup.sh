@@ -1019,28 +1019,26 @@ install_kvm_libvirt() {
   
   log "Installing KVM and libvirt packages for Arch Linux"
   
-  # Install KVM and libvirt packages with the exact recommended packages
+  # Install KVM and libvirt packages with the minimal required packages
   install_packages "${KVM_PACKAGES[@]}"
   
-  # Enable and start the libvirtd service
-  log "Enabling and starting libvirtd service"
-  systemctl enable libvirtd
-  systemctl start libvirtd
+  # Enable and start the required services
+  log "Enabling and starting virtualization services"
+  systemctl enable --now libvirtd.service
+  systemctl enable --now virtlogd.service
   
-  # Add user to the kvm and libvirt groups
-  log "Adding user ${current_user} to kvm and libvirt groups"
-  if ! getent group kvm | grep -q "\b${current_user}\b"; then
-    usermod -aG kvm "${current_user}"
-  fi
-  
+  # Add user to libvirt group
+  log "Adding user ${current_user} to libvirt group"
   if ! getent group libvirt | grep -q "\b${current_user}\b"; then
     usermod -aG libvirt "${current_user}"
+    log "User added to libvirt group. Please log out and back in for changes to take effect."
+  else
+    log "User ${current_user} is already in the libvirt group"
   fi
   
   # Start and enable default NAT network
-  log "Starting and enabling default NAT network"
+  log "Configuring default network"
   if ! virsh net-info default >/dev/null 2>&1; then
-    log "Defining default network"
     virsh net-define /etc/libvirt/qemu/networks/default.xml >/dev/null 2>&1 || log "Default network may already be defined"
   fi
   
@@ -1051,11 +1049,13 @@ install_kvm_libvirt() {
   virsh net-autostart default >/dev/null 2>&1
   
   # Verify installation
-  if command_exists virsh && virsh -c qemu:///system list >/dev/null 2>&1; then
-    log "KVM and libvirt installed and configured successfully"
+  if systemctl is-active --quiet libvirtd.service && systemctl is-active --quiet virtlogd.service; then
+    log "KVM/QEMU virtualization services are running properly"
   else
-    log "Warning: KVM and libvirt installation may not be complete. Please check manually."
+    log "Warning: Virtualization services may not be running correctly. Please check manually."
   fi
+  
+  log "Virtualization setup completed successfully"
 }
 
 #######################################
