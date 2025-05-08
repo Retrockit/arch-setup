@@ -1222,7 +1222,7 @@ install_gaming_udev_rules() {
 }
 
 #######################################
-# Detect NVIDIA hardware and install drivers
+# Detect NVIDIA hardware and install drivers with nvidia-inst
 # Globals:
 #   None
 # Arguments:
@@ -1232,32 +1232,52 @@ install_nvidia_drivers() {
   log "Checking for NVIDIA graphics hardware"
   
   # Check for NVIDIA hardware using lspci
-  if lspci | grep -i nvidia >/dev/null 2>&1; then
-    log "NVIDIA hardware detected"
-    
-    # Check if nvidia-inst tool is available (EndeavourOS specific)
-    if ! command -v nvidia-inst >/dev/null 2>&1; then
-      log "Error: nvidia-inst tool not found. This function requires EndeavourOS."
-      log "Please install NVIDIA drivers manually for your system."
-      return 1
-    fi
-    
-    # Run the EndeavourOS NVIDIA installer with 32-bit support
-    log "Installing NVIDIA drivers with 32-bit support"
-    nvidia-inst --32
-    
-    # Check installation status
-    if lsmod | grep -q nvidia; then
-      log "NVIDIA drivers installed successfully"
-    else
-      log "Warning: NVIDIA driver installation may have failed. Please check manually."
-      log "You may need to reboot for the drivers to load properly."
-    fi
-    
-    log "NVIDIA driver installation complete"
-  else
+  if ! lspci | grep -i nvidia >/dev/null 2>&1; then
     log "No NVIDIA hardware detected, skipping NVIDIA driver installation"
+    return 0
   fi
+  
+  log "NVIDIA hardware detected"
+  
+  # Check if nvidia-inst tool is available (EndeavourOS specific)
+  if ! command -v nvidia-inst >/dev/null 2>&1; then
+    log "Error: nvidia-inst tool not found. This function requires EndeavourOS."
+    log "Please install NVIDIA drivers manually for your system."
+    return 1
+  fi
+  
+  # Check if NVIDIA drivers are already installed
+  if lsmod | grep -q nvidia && pacman -Q lib32-nvidia-utils >/dev/null 2>&1; then
+    log "NVIDIA drivers and 32-bit libraries appear to be already installed"
+    return 0
+  fi
+  
+  # Clear notification for the user
+  echo ""
+  log "===================================================="
+  log "NVIDIA driver installation will begin now"
+  log "Please enter your password when prompted"
+  log "===================================================="
+  echo ""
+  
+  # Get current user
+  local current_user
+  current_user=$(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")
+  
+  # Run nvidia-inst as appropriate user
+  if [ "$(id -u)" -eq 0 ]; then
+    # If running as root, switch to the regular user
+    su - "${current_user}" -c "nvidia-inst --32"
+  else
+    # If already running as non-root, just execute
+    nvidia-inst --32
+  fi
+  
+  log "NVIDIA driver installation process completed"
+  log "A system reboot is recommended to fully activate the NVIDIA drivers"
+  
+  # Set reboot recommended flag
+  REBOOT_RECOMMENDED="true"
 }
 
 #######################################
